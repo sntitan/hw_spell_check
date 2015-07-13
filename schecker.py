@@ -60,9 +60,10 @@ class line_ele:
         if str_state != SN_ENUM_INIT:
             self.line_ana.append(tmp_ele)
 
-def get_string_from_line(line_e, instr):
+def get_string_from_line(line_str, instr):
     tmp_str = ""
     tmp_str_list = []
+    line_e = line_ele(line_str)
     for ele in line_e.line_ana:
         if ele != '"':
             if instr:
@@ -78,39 +79,17 @@ def get_string_from_line(line_e, instr):
         tmp_str_list.append(tmp_str)
     return tmp_str_list, instr
 
-def pre_analyse(line):
-    #Delete line include
-    include_re = re.compile("[\s]*#include[\s]+(\"|<)[\w/\.]+(\"|>)")
-    if include_re.match(line):
-        return False
-    ccoment_re = re.compile("[\s]*/\*[\w\W]*?\*/")
-    if ccoment_re.match(line):
-        return False
-    cppcomment_re = re.compile("[\s]*//.*")
-    if cppcomment_re.match(line):
-        return False
-    return True
-
 #return a list
 #[(line_no, string), ...]
-def read_in_strings(file_name):
-    line_list = []
+def analyse_string(file_lines):
     str_list = []
-    with open(file_name, "r") as fh:
-        line_no = 0
-        for line in fh.readlines():
-            line_no = line_no + 1
-            if not pre_analyse(line):
-                continue
-            line_e = line_ele(line[:-2], line_no)
-            line_list.append(line_e)
     instr = False
-    for line in line_list:
-        line_str_list, instr = get_string_from_line(line, instr)
+    for line in file_lines:
+        line_str_list, instr = get_string_from_line(line[1], instr)
         if len(line_str_list) == 0:
             continue
         for line_str in line_str_list:
-            str_list.append((line.line_no, line_str))
+            str_list.append((line[0], line_str))
     return str_list
 
 def precheck_delete_chinese(line):
@@ -188,19 +167,25 @@ def check_file(fname, outfile_handle=None):
     with open(fname, "r") as fh:
         filebuff = fh.read()
     file_lines = pre_analyse(filebuff)
+
+    print("DEBUG: pre_analyse:")
     for line in file_lines:
         print("line %d: [%s]" %(line[0], line[1]))
 
+    #analyse string-list in it
+    strl = analyse_string(file_lines)
+    if len(strl) == 0:
+        return 0
+    
+    print("DEBUG: analyse:")
+    for line in strl:
+        print("line %d: [%s]" %(line[0], line[1]))
 
-    #Read in file, and analyse string-list in it
-#    strl = read_in_strings(fname)
-#    if len(strl) == 0:
-#        return 0
-#    pre_check(strl)
-#    for line in strl:
-#        #do spelling check, and print error
-#        if not outfile_handle:
-#            print("line %d: [%s]" %(line[0], line[1]))
+    pre_check(strl)
+
+    print("DEBUG: after pre_check:")
+    for line in strl:
+        print("line %d: [%s]" %(line[0], line[1]))
 
 def print_help_info():
     print '''
