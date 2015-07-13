@@ -78,6 +78,19 @@ def get_string_from_line(line_e, instr):
         tmp_str_list.append(tmp_str)
     return tmp_str_list, instr
 
+def pre_analyse(line):
+    #Delete line include
+    include_re = re.compile("[\s]*#include[\s]+(\"|<)[\w/\.]+(\"|>)")
+    if include_re.match(line):
+        return False
+    ccoment_re = re.compile("[\s]*/\*[\w\W]*?\*/")
+    if ccoment_re.match(line):
+        return False
+    cppcomment_re = re.compile("[\s]*//.*")
+    if cppcomment_re.match(line):
+        return False
+    return True
+
 #return a list
 #[(line_no, string), ...]
 def read_in_strings(file_name):
@@ -87,6 +100,8 @@ def read_in_strings(file_name):
         line_no = 0
         for line in fh.readlines():
             line_no = line_no + 1
+            if not pre_analyse(line):
+                continue
             line_e = line_ele(line[:-2], line_no)
             line_list.append(line_e)
     instr = False
@@ -109,16 +124,83 @@ def pre_check(string_list):
         if not precheck_delete_chinese(line):
             string_list.remove(line)
 
+SN_CPOS_EN_CODE = 0
+SN_CPOS_EN_COMMENT = 1
+include_re = re.compile("[\s]*#include[\s]+(\"|<)[\w/\.]+(\"|>)")
+cppcomment_re = re.compile(".*?//.*")
+ccomment_begin_re = re.compile(".*?/\*")
+ccomment_end_re = re.compile(".*?\*/")
+#line[in]: line string
+#pos[in]: line pos, SN_CPOS_EN
+#return: line_without_comments, pos
+def preanalyse_oneline(line, pos):
+    if pos == SN_CPOS_EN_CODE:
+        #delete include statement
+        if include_re.match(line):
+            return "", SN_CPOS_EN_CODE
+        #delete cpp-style comment
+        if cppcomment_re.match(line):
+            slash_pos = line.find('//')
+            if slash_pos != 0:
+                return preanalyse_oneline(line[:slash_pos], SN_CPOS_EN_CODE)
+            else:
+                return "", SN_CPOS_EN_CODE
+        #Deal with line with c-style comment
+        if ccomment_begin_re.match(line):
+            line_without_comments = ""
+            cc_beginpos = line.find("/*")
+            if cc_beginpos != 0:
+                line_without_comments = line[:cc_beginpos]
+            if ccomment_end_re.match(line[cc_beginpos:]):
+                line_without_comments = line_without_comments + " "
+                cc_endpos = line.find("*/")
+                tmpline, pos = preanalyse_oneline(line[cc_endpos+2:], SN_CPOS_EN_CODE)
+                return line_without_comments + tmpline, pos
+            else:
+                return line_without_comments, SN_CPOS_EN_COMMENT
+
+        return line, SN_CPOS_EN_CODE
+    elif pos == SN_CPOS_EN_COMMENT:
+        if ccomment_end_re.match(line):
+            cc_endpos = line.find("*/")
+            return preanalyse_oneline(line[cc_endpos+2:], SN_CPOS_EN_CODE)
+        else:
+            return "", SN_CPOS_EN_COMMENT
+    else:
+        raise "Unknown line pos"
+
+#pre-analyse, delete include, comments
+def pre_analyse(filebuff):
+    fline = []
+    line_no = 0
+    pos = SN_CPOS_EN_CODE
+    for line in filebuff.splitlines():
+        line_no = line_no + 1
+        tmpline, pos = preanalyse_oneline(line, pos)
+        if len(tmpline) != 0:
+            fline.append((line_no, tmpline))
+    return fline
+
+
 def check_file(fname, outfile_handle=None):
+    #Read in file
+    filebuff = None
+    with open(fname, "r") as fh:
+        filebuff = fh.read()
+    file_lines = pre_analyse(filebuff)
+    for line in file_lines:
+        print("line %d: [%s]" %(line[0], line[1]))
+
+
     #Read in file, and analyse string-list in it
-    strl = read_in_strings(fname)
-    if len(strl) == 0:
-        return 0
-    pre_check(strl)
-    for line in strl:
-        #do spelling check, and print error
-        if not outfile_handle:
-            print("line %d: [%s]" %(line[0], line[1]))
+#    strl = read_in_strings(fname)
+#    if len(strl) == 0:
+#        return 0
+#    pre_check(strl)
+#    for line in strl:
+#        #do spelling check, and print error
+#        if not outfile_handle:
+#            print("line %d: [%s]" %(line[0], line[1]))
 
 def print_help_info():
     print '''
