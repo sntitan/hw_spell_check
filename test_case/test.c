@@ -20,6 +20,9 @@ int main()
 	char *ptmp = "hahahah", *pstr_2line = "hello \
 				the second line\r\n";	
     char* /*just for test*/ a = "abd"; //this is test
+    char* b = "ccc"; /* test comments //haha
+    char* c = "ddd";
+*/
 	printf("debug: pstr %s\r\n", pstr);
 	printf("debug: pstr_2line: %s\r\n", pstr_2line);
 	printf("debug: pstr_2line: %s, %s\r\n", "abc", "bcd");
